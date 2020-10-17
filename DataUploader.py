@@ -1,5 +1,6 @@
 from DbConnector import DbConnector
 from datetime import datetime
+import time
 
 import os
 
@@ -31,7 +32,10 @@ class DataUploader:
         Method for inserting many documents into a collection
         '''
 
-        self.db[collection].insert_many(data)
+        try:
+            self.db[collection].insert_many(data, False)
+        except Exception as e:
+            print("Not able to insert data into collection " + collection + e)
 
     def get_labeled_ids(self):
         '''
@@ -76,13 +80,13 @@ class DataUploader:
                         activities_with_labels.append(items)
 
         for file_path in plt_files:
-            if self.get_trackpoints(root + "/" + file_path) is not None:
-                start_time, end_time, single_trackpoints = self.get_trackpoints(root + "/" + file_path)
+            start_time, end_time, single_trackpoints = self.get_trackpoints(root + "/" + file_path)
+            if single_trackpoints is not None:
                 if len(activities_with_labels) > 0:
                     for activity in activities_with_labels:
                         if activity[0] == start_time and activity[1] == end_time:
                             activities.append({
-                                "id": self.ACTIVITY_ID,
+                                "_id": self.ACTIVITY_ID,
                                 "user_id": user_id,
                                 "transportation_mode": activity[2],
                                 "start_date_time": start_time,
@@ -92,7 +96,7 @@ class DataUploader:
                             self.ACTIVITY_ID += 1
                 else:
                     activities.append({
-                                "id": self.ACTIVITY_ID,
+                                "_id": self.ACTIVITY_ID,
                                 "user_id": user_id,
                                 "transportation_mode": "null",
                                 "start_date_time": start_time,
@@ -112,6 +116,11 @@ class DataUploader:
         :return: start and end time of trajectory + trackpoints data structured for database injection
         '''
 
+        # if file size is bigger than this, it has more than 2500 lines and is excluded.
+        file_stats = os.stat(file_path)
+        if file_stats.st_size > 204500:
+            return None, None, None
+
         start_time = datetime(2200, 1, 1, 00, 00, 00)
         end_time = datetime(1900, 1, 1, 00, 00, 00)
 
@@ -119,8 +128,10 @@ class DataUploader:
 
         with open(file_path) as file:
             records = file.readlines()[6:]
+
             if len(records) > 2500:
-                return
+                return None, None, None
+
             for record in records:
                 items = record.strip().split(',')
                 time = self.read_datetime((items[5] + ' ' + items[6]))
@@ -132,14 +143,15 @@ class DataUploader:
                     end_time = time
 
                 trackpoints.append({
-                    "id": self.TRACKPOINT_ID,
+                    "_id": self.TRACKPOINT_ID,
                     "activity_id": self.ACTIVITY_ID,
-                    "lat": items[0],
-                    "lon": items[1],
-                    "altitude": items[3],
-                    "date_days": items[4],
+                    "lat": float(items[0]),
+                    "lon": float(items[1]),
+                    "altitude": float(items[3]),
+                    "date_days": float(items[4]),
                     "date_time": time
                 })
+
 
                 self.TRACKPOINT_ID += 1
 
@@ -149,6 +161,8 @@ class DataUploader:
         '''
         Get the data from the files and upload it to the database
         '''
+
+        start_time = time.time()
 
         labeled_ids = self.get_labeled_ids()
 
@@ -165,8 +179,8 @@ class DataUploader:
                 continue
             user_id = path_parts[3]
 
-            print("Adding user data...\n")
-            if user_id not in users_ids:
+            print("\nGetting user data...")
+            if user_id not in users_ids and user_id != "":
                 users_ids.append(user_id)
                 users.append(({"_id": user_id, "has_labels": user_id in labeled_ids}))
 
@@ -177,7 +191,7 @@ class DataUploader:
             if "Trajectory" in root:
                 files.sort()
 
-                print("Adding activites and trackpoints for user: " + user_id + "\n")
+                print("Getting activites and trackpoints for user: " + user_id)
                 if label_file != "":
                     trackpoints_single, activities_single = self.get_trackpoints_and_activites(root, files, label_file, user_id)
                 else:
@@ -186,16 +200,28 @@ class DataUploader:
                 activites.extend(activities_single)
                 trackpoints.extend(trackpoints_single)
 
-            print("Number of trackpoints: " + str(len(trackpoints)))
+        print("Trackpoint ID: " + str(self.TRACKPOINT_ID))
+        print("Number of trackpoints: " + str(len(trackpoints)))
+
+        print("READ ALL FILES")
+
+        time_to_read = time.time()
+        print("Time to read files: --- %s seconds ---" % (time_to_read - start_time))
 
         print("Inserting data into Users")
         self.insert_data_many("User", users)
+        time_to_upload_users = time.time()
+        print("Time to insert Users: --- %s seconds ---" % (time_to_upload_users - time_to_read))
 
         print("Inserting data into Activity")
         self.insert_data_many("Activity", activites)
+        time_to_upload_activities = time.time()
+        print("Time to insert Activities: --- %s seconds ---" % (time_to_upload_activities - time_to_upload_users))
 
         print("Inserting data into TrackPoints")
-        self.insert_data_many("TrackPoints", trackpoints)
+        self.insert_data_many("TrackPoint", trackpoints)
+        time_to_upload_tp = time.time()
+        print("Time to insert TrackPoints: --- %s seconds ---" % (time_to_upload_tp - time_to_upload_activities))
 
     def drop_collections(self):
         collection = self.db['User']
@@ -211,6 +237,8 @@ def main():
     program = None
     try:
         program = DataUploader()
+        program.drop_collections()
+        program.create_collections()
         program.upload_data()
     except Exception as e:
         print("ERROR: Failed to use database:", e.with_traceback())
