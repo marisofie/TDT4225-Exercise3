@@ -68,6 +68,7 @@ class DataUploader:
 
         activities_with_labels = []
         activities = []
+        activities_for_user = []
         trackpoints = []
 
         if label_file != "":
@@ -80,7 +81,8 @@ class DataUploader:
                         activities_with_labels.append(items)
 
         for file_path in plt_files:
-            start_time, end_time, single_trackpoints = self.get_trackpoints(root + "/" + file_path)
+            activity_added_with_label = False
+            start_time, end_time, single_trackpoints = self.get_trackpoints(root + "/" + file_path, user_id)
             if single_trackpoints is not None:
                 if len(activities_with_labels) > 0:
                     for activity in activities_with_labels:
@@ -93,8 +95,14 @@ class DataUploader:
                                 "end_date_time": end_time
                             })
 
+                            activities_for_user.append({
+                                "id": self.ACTIVITY_ID,
+                                "transportation_mode": activity[2]
+                            })
+
                             self.ACTIVITY_ID += 1
-                else:
+                            activity_added_with_label = True
+                if activity_added_with_label is False:
                     activities.append({
                                 "_id": self.ACTIVITY_ID,
                                 "user_id": user_id,
@@ -102,14 +110,20 @@ class DataUploader:
                                 "start_date_time": start_time,
                                 "end_date_time": end_time
                             })
+
+                    activities_for_user.append({
+                                "id": self.ACTIVITY_ID,
+                                "transportation_mode": "null"
+                            })
+
                     self.ACTIVITY_ID += 1
 
                 trackpoints.extend(single_trackpoints)
 
-        return trackpoints, activities
+        return trackpoints, activities, activities_for_user
 
 
-    def get_trackpoints(self, file_path):
+    def get_trackpoints(self, file_path, user_id):
         '''
         Get specific trackpoints for a plt file
         :param file_path: file path for the plt file
@@ -145,13 +159,13 @@ class DataUploader:
                 trackpoints.append({
                     "_id": self.TRACKPOINT_ID,
                     "activity_id": self.ACTIVITY_ID,
+                    "user_id": user_id,
                     "lat": float(items[0]),
                     "lon": float(items[1]),
                     "altitude": float(items[3]),
                     "date_days": float(items[4]),
                     "date_time": time
                 })
-
 
                 self.TRACKPOINT_ID += 1
 
@@ -182,7 +196,6 @@ class DataUploader:
             print("\nGetting user data...")
             if user_id not in users_ids and user_id != "":
                 users_ids.append(user_id)
-                users.append(({"_id": user_id, "has_labels": user_id in labeled_ids}))
 
             if user_id in labeled_ids:
                 label_file = DATASET_PATH + user_id + "/labels.txt"
@@ -193,9 +206,11 @@ class DataUploader:
 
                 print("Getting activites and trackpoints for user: " + user_id)
                 if label_file != "":
-                    trackpoints_single, activities_single = self.get_trackpoints_and_activites(root, files, label_file, user_id)
+                    trackpoints_single, activities_single, activities_for_user = self.get_trackpoints_and_activites(root, files, label_file, user_id)
                 else:
-                    trackpoints_single, activities_single = self.get_trackpoints_and_activites(root, files, "", user_id)
+                    trackpoints_single, activities_single, activities_for_user = self.get_trackpoints_and_activites(root, files, "", user_id)
+
+                users.append({"_id": user_id, "has_labels": user_id in labeled_ids, "activities": activities_for_user})
 
                 activites.extend(activities_single)
                 trackpoints.extend(trackpoints_single)
