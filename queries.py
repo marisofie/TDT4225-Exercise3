@@ -14,3 +14,7 @@ class Query:
             count = col.count()
             print(f"Collections {collection} has {count} documents.")
 
+    def q4(self):
+        collection = self.db["Activity"]
+        user_ids = collection.distinct("user_id", {"transportation_mode": "taxi"})
+        print(user_ids)
