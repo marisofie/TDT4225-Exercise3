@@ -1,4 +1,7 @@
 from DbConnector import DbConnector
+from pprint import pprint
+from datetime import datetime
+from haversine import haversine
 
 class Query:
     def __init__(self):
@@ -18,3 +21,41 @@ class Query:
         collection = self.db["Activity"]
         user_ids = collection.distinct("user_id", {"transportation_mode": "taxi"})
         print(user_ids)
+
+    def q7(self):
+        USER_ID = "112"
+        ACTIVITY = "walk"
+        activity_col = self.db["Activity"]
+        activities = activity_col.aggregate([
+            {"$match": {
+                "transportation_mode": ACTIVITY,
+                "user_id": USER_ID,
+                "start_date_time": {"$gte": datetime(year=2008, month=1, day=1)},
+                "end_date_time": {"$lt": datetime(year=2009, month=1, day=1)}
+            }},
+            {"$lookup": {
+                "from": "TrackPoint", "localField": "_id", "foreignField": "activity_id", "as": "trackpoints"
+            }},
+            {"$project": {
+                "trackpoints.lat": 1,
+                "trackpoints.lon": 1
+            }}
+        ])
+
+        total_dist = 0
+        for activity in activities:
+            trackpoints = activity["trackpoints"]
+            for i in range(len(trackpoints)-1):
+                lat1 = trackpoints[i]["lat"]
+                lon1 = trackpoints[i]["lon"]
+                lat2 = trackpoints[i+1]["lat"]
+                lon2 = trackpoints[i+1]["lon"]
+                coord1 = (float(lat1), float(lon1))
+                coord2 = (float(lat2), float(lon2))
+                dist = haversine(coord1, coord2)
+                total_dist += dist
+
+        print(f"Total distance walked by user 112: {total_dist}")
+
+query = Query()
+query.q7()
