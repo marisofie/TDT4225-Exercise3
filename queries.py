@@ -20,7 +20,7 @@ class Query:
     def q4(self):
         collection = self.db["Activity"]
         user_ids = collection.distinct("user_id", {"transportation_mode": "taxi"})
-        print(user_ids)
+        print("The following users have taken a taxi:",user_ids)
 
     def q7(self):
         activity_col = self.db["Activity"]
@@ -69,3 +69,6 @@ class Query:
         for data in user_ids:
             pprint(data["_id"])
 
+
+query = Query()
+query.q4()
