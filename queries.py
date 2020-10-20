@@ -23,13 +23,11 @@ class Query:
         print(user_ids)
 
     def q7(self):
-        USER_ID = "112"
-        ACTIVITY = "walk"
         activity_col = self.db["Activity"]
         activities = activity_col.aggregate([
             {"$match": {
-                "transportation_mode": ACTIVITY,
-                "user_id": USER_ID,
+                "transportation_mode": "walk",
+                "user_id": "112",
                 "start_date_time": {"$gte": datetime(year=2008, month=1, day=1)},
                 "end_date_time": {"$lt": datetime(year=2009, month=1, day=1)}
             }},
@@ -46,12 +44,8 @@ class Query:
         for activity in activities:
             trackpoints = activity["trackpoints"]
             for i in range(len(trackpoints)-1):
-                lat1 = trackpoints[i]["lat"]
-                lon1 = trackpoints[i]["lon"]
-                lat2 = trackpoints[i+1]["lat"]
-                lon2 = trackpoints[i+1]["lon"]
-                coord1 = (float(lat1), float(lon1))
-                coord2 = (float(lat2), float(lon2))
+                coord1 = (float(trackpoints[i]["lat"]), float(trackpoints[i]["lon"]))
+                coord2 = (float(trackpoints[i+1]["lat"]), float(trackpoints[i+1]["lon"]))
                 dist = haversine(coord1, coord2)
                 total_dist += dist
 
