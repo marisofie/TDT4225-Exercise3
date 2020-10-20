@@ -69,6 +69,3 @@ class Query:
         for data in user_ids:
             pprint(data["_id"])
 
-
-query = Query()
-query.q4()
