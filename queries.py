@@ -51,5 +51,21 @@ class Query:
 
         print(f"Total distance walked by user 112: {total_dist}")
 
-query = Query()
-query.q7()
+    def q10(self):
+        lat = 39.916
+        lon = 116.397
+        collection = self.db["TrackPoint"]
+        user_ids = collection.aggregate([
+            {"$match": {
+                "lat": {"$lt": lat + 0.0005, "$gte": lat - 0.0005},
+                "lon": {"$lt": lon + 0.0005, "$gte": lon - 0.0005}
+            }},
+            {"$group": {
+               "_id": "$user_id",
+            }}
+        ])
+
+        print("The following users have been in the Forbidden City:")
+        for data in user_ids:
+            pprint(data["_id"])
+
