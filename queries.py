@@ -83,7 +83,6 @@ class Query:
 
     def q8(self):
         collection = self.db["TrackPoint"]
-        # collection.ensure_index("_id", 1)
         meters = collection.aggregate([
             {
                 "$match": {
@@ -142,7 +141,7 @@ class Query:
         ], allowDiskUse=True)
         print("Top 20 users that gained most altitude:")
         for data in list(meters):
-            print(" {}: {}".format(data["_id"], data["total"]))
+            print(" {}: {}".format(data["_id"], float(data["total"]) * 0.3048))
 
     def q10(self):
         lat = 39.916
